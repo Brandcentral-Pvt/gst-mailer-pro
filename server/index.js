@@ -406,22 +406,30 @@ api.post('/recipients/upload', upload.single('file'), async (req, res) => {
     let emailCol = cols.emailCol;
     if (!emailCol) emailCol = headers.find((h, i) => rows.slice(headerIdx + 1, headerIdx + 6).some((r) => String(r[i] || '').includes('@')));
     const vendorCol = cols.vendorCol || headers[0];
+    const ccCol = cols.ccCol || headers.find((h) => /^(cc|cc\s*(email|mail|e-mail))\b/i.test(String(h).trim())) || null;
     if (!vendorCol || !emailCol) {
       return res.status(422).json({ error: 'Could not detect Vendor Name and Mail ID columns', columns: headers });
     }
     const vi = headers.indexOf(vendorCol);
     const ei = headers.indexOf(emailCol);
+    const ci = ccCol ? headers.indexOf(ccCol) : -1;
     const store = loadRecipients();
     let imported = 0;
+    let withCc = 0;
     rows.slice(headerIdx + 1).forEach((r) => {
       const vendor = String(r[vi] || '').trim();
-      const email = String(r[ei] || '').trim();
+      const email = String(r[ei] || '').replace(/;/g, ',').trim();
+      const cc = ci >= 0 ? String(r[ci] || '').replace(/;/g, ',').trim() : '';
       if (!vendor || !email.includes('@')) return;
-      store[strictKeyLoose(vendor)] = { vendor, email, cc: '' };
+      store[strictKeyLoose(vendor)] = { vendor, email, cc };
       imported += 1;
+      if (cc.includes('@')) withCc += 1;
     });
     saveRecipients(store);
-    res.json({ ok: true, imported, stored: Object.keys(store).length, vendorCol, emailCol, vendors: isLoaded() ? withRecipients(getVendorList()) : [] });
+    res.json({
+      ok: true, imported, withCc, stored: Object.keys(store).length,
+      vendorCol, emailCol, ccCol, vendors: isLoaded() ? withRecipients(getVendorList()) : [],
+    });
   } catch (err) {
     res.status(422).json({ error: `Could not read mapping file: ${err.message}` });
   } finally {
@@ -435,10 +443,23 @@ api.delete('/recipients', (req, res) => {
 });
 
 api.get('/recipients/template.csv', (req, res) => {
+  const store = loadRecipients();
+  const cell = (value) => {
+    const s = String(value ?? '');
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const line = (vendor, email = '', cc = '') => [cell(vendor), cell(email), cell(cc)].join(',');
   const lines = ['Vendor Name,Mail ID,CC'];
   if (isLoaded()) {
-    getVendorList().forEach((v) => lines.push(`"${v.vendor.replace(/"/g, '""')}",,`));
-  } else lines.push('"SAMPLE VENDOR PVT LTD",,');
+    getVendorList().forEach((v) => {
+      const rec = store[strictKeyLoose(v.vendor)] || {};
+      lines.push(line(v.vendor, rec.email || '', rec.cc || ''));
+    });
+  } else {
+    const entries = Object.values(store);
+    if (entries.length) entries.forEach((e) => lines.push(line(e.vendor, e.email || '', e.cc || '')));
+    else lines.push(line('SAMPLE VENDOR PVT LTD'));
+  }
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename="vendor_email_mapping_template.csv"');
   res.send(lines.join('\n'));

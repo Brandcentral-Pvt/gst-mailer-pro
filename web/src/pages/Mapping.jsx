@@ -93,8 +93,14 @@ export default function Mapping({ state, onVendors, toast, openVendor, setRoute 
       const res = await api.upload('/api/recipients/upload', file);
       if (res.error) throw new Error(res.error);
       onVendors(res);
-      setImportInfo({ file: file.name, imported: res.imported, vendorCol: res.vendorCol, emailCol: res.emailCol });
-      toast({ tone: 'ok', title: 'Mapping file imported', body: `${res.imported} vendor ↔ mail ID pairs (${res.vendorCol} → ${res.emailCol}).` });
+      setImportInfo({
+        file: file.name, imported: res.imported, vendorCol: res.vendorCol, emailCol: res.emailCol,
+        ccCol: res.ccCol, ccRows: res.withCc,
+      });
+      toast({
+        tone: 'ok', title: 'Mapping file imported',
+        body: `${res.imported} vendor ↔ mail ID pairs (${res.vendorCol} → ${res.emailCol})${res.withCc ? ` · ${res.withCc} CC row(s)` : ''}.`,
+      });
     } catch (e) {
       setImportInfo({ file: file.name, error: e.message });
       toast({ tone: 'err', title: 'Mapping file not usable', body: e.message });
@@ -151,11 +157,11 @@ export default function Mapping({ state, onVendors, toast, openVendor, setRoute 
               <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.csv" hidden onChange={(e) => uploadFile(e.target.files?.[0])} />
               <span className="grid h-10 w-10 place-items-center rounded-xl bg-white text-brand-600 ring-1 ring-ink-100"><Upload className="h-5 w-5" /></span>
               <p className="mt-2 text-[12.5px] font-bold text-ink-800">Upload mapping file</p>
-              <p className="text-[11px] text-ink-400">Vendor Name + Mail ID columns (.xlsx / .csv)</p>
+              <p className="text-[11px] text-ink-400">Vendor Name + Mail ID + optional CC (.xlsx / .csv)</p>
             </div>
             {importInfo && (
               <div className={cls('rounded-lg p-2.5 text-[11.5px]', importInfo.error ? 'bg-rose-100/60 text-rose-600' : 'bg-mint-100/70 text-emerald-700')}>
-                {importInfo.error ? importInfo.error : `${importInfo.imported} rows imported · ${importInfo.vendorCol} → ${importInfo.emailCol}`}
+                {importInfo.error ? importInfo.error : `${importInfo.imported} rows imported · ${importInfo.vendorCol} → ${importInfo.emailCol}${importInfo.ccCol ? ` · CC: ${importInfo.ccCol} (${importInfo.ccRows || 0})` : ''}`}
               </div>
             )}
             <div className="grid grid-cols-2 gap-2">

@@ -18,6 +18,7 @@ const VENDOR_CANDIDATES = [
 const GSTIN_CANDIDATES = ['gstin', 'gstin of supplier', 'supplier gstin', 'vendor gstin', 'party gstin', 'gstin/uin', 'gst no'];
 const STATUS_CANDIDATES = ['match status', 'reconciliation status', 'reco status', 'gst status', 'status'];
 const EMAIL_CANDIDATES = ['email id', 'mail id', 'vendor email', 'email address', 'e-mail', 'email', 'mail'];
+const CC_CANDIDATES = ['cc', 'cc email', 'cc mail id', 'cc mail', 'cc emails', 'carbon copy'];
 const AMOUNT_HINTS = ['cgst', 'sgst', 'igst', 'utgst', 'cess', 'total gst', 'taxable', 'tax amount', 'invoice value', 'bill amount', 'total tax', 'net amount', 'amount'];
 const SKIP_AMOUNT = ['invoice no', 'invoice number', 'reference', 'gstin', 'date', 'rate', '%', 'hsn', 'sac', 'phone', 'mobile', 'entry no', 'irn'];
 
@@ -164,15 +165,16 @@ export function detectColumns(headers) {
   const gstinCol = pickColumn(headers, GSTIN_CANDIDATES);
   const statusCol = pickColumn(headers, STATUS_CANDIDATES);
   const emailCol = pickColumn(headers, EMAIL_CANDIDATES);
+  const ccCol = pickColumn(headers, CC_CANDIDATES);
   const dateCol = pickColumn(headers, ['invoice date', 'bill date', 'transaction date', 'doc date', 'date'])
     || headers.find((h) => /date/i.test(h) && !/update/i.test(h)) || null;
   const amountCols = headers.filter((h) => {
     const l = h.toLowerCase();
-    if ([vendorCol, gstinCol, statusCol, emailCol].includes(h)) return false;
+    if ([vendorCol, gstinCol, statusCol, emailCol, ccCol].includes(h)) return false;
     if (SKIP_AMOUNT.some((s) => l.includes(s))) return false;
     return AMOUNT_HINTS.some((k) => l.includes(k)) || h.includes('₹');
   });
-  return { vendorCol, gstinCol, statusCol, emailCol, dateCol, amountCols };
+  return { vendorCol, gstinCol, statusCol, emailCol, ccCol, dateCol, amountCols };
 }
 
 // ---------------------------------------------------------------------------
