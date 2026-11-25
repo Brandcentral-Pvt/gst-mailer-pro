@@ -381,7 +381,8 @@ export default function Settings({ open, onClose, settings, onSaved, toast, init
 
           <div className="flex flex-wrap gap-2">
             {!gmailConnected ? (
-              <button className="btn btn-primary" onClick={connectGmail} disabled={busy || !gm.clientId || !gm.clientSecret}>
+              <button className="btn btn-primary" onClick={connectGmail}
+                disabled={busy || !gm.clientId || (!gm.clientSecret && !settings.gmail?.hasCredentials)}>
                 {busy ? <Spinner /> : <Link2 className="h-4 w-4" />} Connect Gmail
               </button>
             ) : (

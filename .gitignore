@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/attachments/
 data/workbook/
+data/auth.json
 uploads/
 *.log
 .DS_Store

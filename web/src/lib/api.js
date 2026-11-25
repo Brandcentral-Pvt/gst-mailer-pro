@@ -1,10 +1,14 @@
 const jsonHeaders = { 'Content-Type': 'application/json' };
+const withSession = (options = {}) => ({ ...options, credentials: 'include' });
 
-async function handle(res) {
+async function handle(res, path) {
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) {
+    if (res.status === 401 && !String(path).startsWith('/api/auth/login')) {
+      window.dispatchEvent(new CustomEvent('gst:unauthorized'));
+    }
     const msg = (data && data.error) || (typeof data === 'string' ? data : 'Request failed');
     const err = new Error(msg);
     err.status = res.status;
@@ -15,13 +19,15 @@ async function handle(res) {
 }
 
 export const api = {
-  get: (p) => fetch(p).then(handle),
-  post: (p, body) => fetch(p, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(body ?? {}) }).then(handle),
-  del: (p) => fetch(p, { method: 'DELETE' }).then(handle),
+  get: (p) => fetch(p, withSession()).then((r) => handle(r, p)),
+  post: (p, body) => fetch(p, withSession({
+    method: 'POST', headers: jsonHeaders, body: JSON.stringify(body ?? {}),
+  })).then((r) => handle(r, p)),
+  del: (p) => fetch(p, withSession({ method: 'DELETE' })).then((r) => handle(r, p)),
   upload: (p, file) => {
     const fd = new FormData();
     fd.append('file', file);
-    return fetch(p, { method: 'POST', body: fd }).then(handle);
+    return fetch(p, withSession({ method: 'POST', body: fd })).then((r) => handle(r, p));
   },
 };
 
