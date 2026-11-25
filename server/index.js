@@ -105,6 +105,20 @@ const api = express.Router();
 
 function fail(res, status, message) { return res.status(status).json({ error: message }); }
 
+/** ExcelJS returns rich text / formula / error cells as objects, not strings. */
+function cellText(value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    if (Array.isArray(value.richText)) return value.richText.map((t) => t.text || '').join('');
+    if (value.error) return ''; // #N/A, #REF!, etc. are not email addresses
+    if (value.text !== undefined) return String(value.text).trim();
+    if (value.result !== undefined) return String(value.result).trim();
+    return '';
+  }
+  const s = String(value).trim();
+  return /^#(N\/A|REF|VALUE|DIV\/0|NAME|NUM|NULL)/i.test(s) ? '' : s;
+}
+
 api.get('/health', (req, res) => {
   res.json({ ok: true, loaded: isLoaded(), version: '2.0.0', uptime: process.uptime() });
 });
@@ -135,7 +149,7 @@ api.post('/upload', upload.single('file'), async (req, res) => {
       const rows = [];
       ws.eachRow((row) => {
         const vals = [];
-        for (let c = 1; c <= row.cellCount; c += 1) vals.push(row.getCell(c).value ?? '');
+        for (let c = 1; c <= row.cellCount; c += 1) vals.push(cellText(row.getCell(c).value));
         rows.push(vals);
       });
       const headerIdx = detectHeaderRow(rows.slice(0, 25));
@@ -397,7 +411,7 @@ api.post('/recipients/upload', upload.single('file'), async (req, res) => {
     const rows = [];
     ws.eachRow((row) => {
       const vals = [];
-      for (let c = 1; c <= row.cellCount; c += 1) vals.push(String(row.getCell(c).value ?? '').trim());
+      for (let c = 1; c <= row.cellCount; c += 1) vals.push(cellText(row.getCell(c).value));
       rows.push(vals);
     });
     const headerIdx = detectHeaderRow(rows.slice(0, 10));
@@ -420,7 +434,7 @@ api.post('/recipients/upload', upload.single('file'), async (req, res) => {
       const vendor = String(r[vi] || '').trim();
       const email = String(r[ei] || '').replace(/;/g, ',').trim();
       const cc = ci >= 0 ? String(r[ci] || '').replace(/;/g, ',').trim() : '';
-      if (!vendor || !email.includes('@')) return;
+      if (!vendor || (!email.includes('@') && !cc.includes('@'))) return;
       store[strictKeyLoose(vendor)] = { vendor, email, cc };
       imported += 1;
       if (cc.includes('@')) withCc += 1;
