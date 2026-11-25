@@ -1,0 +1,37 @@
+{
+  "smtp": {
+    "provider": "gmail",
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "secure": false,
+    "username": "",
+    "senderName": "",
+    "senderEmail": "",
+    "replyTo": "",
+    "globalCc": "",
+    "globalBcc": "",
+    "delaySeconds": 1.2,
+    "detectedDelay": 1.2,
+    "delayUserSet": true
+  },
+  "template": {
+    "subject": "GST Reconciliation Statement & Transaction Details — {vendor_name}",
+    "greeting": "Dear {vendor_name} Team,",
+    "intro": "Please find below the transaction-wise GST records for your account across {tab1_name} and {tab2_name}. The complete workbook ({attachment_filename}) is attached with every record exactly as in our books.",
+    "closing": "Kindly review the attached statement and share your confirmation or reconciliation remarks at the earliest.\n\nWarm regards,\nAccounts & GST Reconciliation Team",
+    "includeStatusBreakdown": true,
+    "includeGstin": true,
+    "includeRows": true,
+    "bodyRowLimit": 100,
+    "attachmentMode": "exact"
+  },
+  "deliveryMode": "smtp",
+  "gmail": {
+    "clientId": "",
+    "clientSecret": "",
+    "redirectUri": "",
+    "refreshToken": "",
+    "accountEmail": "",
+    "workspace": false
+  }
+}

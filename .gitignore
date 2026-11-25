@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/attachments/
+data/workbook/
+uploads/
+*.log
+.DS_Store

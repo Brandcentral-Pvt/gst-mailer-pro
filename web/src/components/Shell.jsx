@@ -1,0 +1,177 @@
+import React from 'react';
+import {
+  LayoutDashboard, UploadCloud, GitMerge, AtSign, Send, Settings2, Database, Mail,
+  Sparkles, CircleDot, ChevronRight, LifeBuoy, FileSpreadsheet,
+} from 'lucide-react';
+import { cls, fmtInt, compactINR } from '../lib/format';
+
+const NAV = [
+  { key: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+  { key: 'upload', label: 'Import workbook', icon: UploadCloud },
+  { key: 'matching', label: 'Vendor matching', icon: GitMerge },
+  { key: 'mapping', label: 'Mail ID mapping', icon: AtSign },
+  { key: 'campaign', label: 'Preview & send', icon: Send },
+];
+
+function transportStatus(settings) {
+  const smtp = settings?.smtp || {};
+  const gmail = settings?.gmail || {};
+  const mode = settings?.deliveryMode === 'gmail' ? 'gmail' : 'smtp';
+  const ready = mode === 'gmail' ? Boolean(gmail.clientId && gmail.clientSecret && gmail.refreshToken) : Boolean(smtp.configured);
+  return {
+    label: mode === 'gmail' ? 'Gmail API' : 'SMTP',
+    ready,
+    title: mode === 'gmail'
+      ? (ready ? `Gmail API: ${gmail.accountEmail || 'connected'}` : 'Gmail API not connected')
+      : (ready ? `SMTP: ${smtp.username}` : 'SMTP not configured'),
+  };
+}
+
+export default function Shell({ route, setRoute, state, children, onSettings }) {
+  const { stats, loaded } = state;
+  const mapped = (state.vendors || []).filter((v) => v.recipients?.length).length;
+  const tx = transportStatus(state.settings);
+
+  return (
+    <div className="flex min-h-screen bg-ink-50">
+      {/* ---------------- sidebar ---------------- */}
+      <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col bg-ink-950 bg-brand-sheen lg:flex">
+        <div className="flex items-center gap-3 px-5 pb-5 pt-6">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="#7ee0ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M3 7l9 4 9-4" /><path d="M12 11v10" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="font-display text-[15px] font-extrabold tracking-tight text-white">GST Ledger</p>
+            <p className="truncate text-[11px] text-brand-200/80">Vendor Mailer Pro</p>
+          </div>
+        </div>
+
+        <nav className="space-y-1 px-3">
+          {NAV.map(({ key, label, icon: Icon }) => {
+            const active = route === key;
+            return (
+              <button key={key} onClick={() => setRoute(key)} className={cls('nav-item w-full', active && 'nav-item-active')}>
+                <span className={cls('grid h-7 w-7 place-items-center rounded-lg bg-white/5', active && 'bg-white/15')}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="flex-1 text-left">{label}</span>
+                <span className={cls('nav-dot h-1.5 w-1.5 rounded-full bg-white/20', active && 'bg-brand-300')} />
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mx-3 mt-5 rounded-2xl border border-white/10 bg-white/5 p-3.5 backdrop-blur">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.08em] text-brand-200/80">
+            <Database className="h-3.5 w-3.5" /> Dataset
+          </div>
+          {loaded ? (
+            <>
+              <p className="mt-2 truncate text-[12.5px] font-semibold text-white" title={stats?.filename}>{stats?.filename}</p>
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px] text-brand-100/80">
+                <div className="rounded-lg bg-white/5 px-2 py-1.5">
+                  <span className="block text-[10px] uppercase tracking-wide text-brand-200/70">Vendors</span>
+                  <span className="text-[13px] font-bold text-white">{fmtInt(stats?.vendorCount)}</span>
+                </div>
+                <div className="rounded-lg bg-white/5 px-2 py-1.5">
+                  <span className="block text-[10px] uppercase tracking-wide text-brand-200/70">Rows</span>
+                  <span className="text-[13px] font-bold text-white">{fmtInt(stats?.totalRows)}</span>
+                </div>
+              </div>
+              <button onClick={() => setRoute('upload')} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/10 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/15">
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Replace workbook
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setRoute('upload')} className="mt-2 w-full rounded-lg bg-brand-400/20 px-2 py-2 text-[11.5px] font-semibold text-brand-100 transition hover:bg-brand-400/30">
+              Import your first workbook
+            </button>
+          )}
+        </div>
+
+        <div className="mt-auto space-y-1 px-3 pb-4">
+          <div className="mx-1 mb-2 rounded-xl border border-white/10 bg-white/[.03] p-3">
+            <div className="flex items-center justify-between text-[11px] text-brand-100/80">
+              <span className="inline-flex items-center gap-1.5"><AtSign className="h-3.5 w-3.5" /> Mail IDs</span>
+              <span className="font-bold text-white">{fmtInt(mapped)}/{fmtInt(state.vendors?.length || 0)}</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-gradient-to-r from-brand-300 to-mint-500"
+                style={{ width: `${state.vendors?.length ? (mapped / state.vendors.length) * 100 : 0}%` }} />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-brand-100/80">
+              <span className="inline-flex items-center gap-1.5"><CircleDot className={cls('h-3.5 w-3.5', tx.ready ? 'text-mint-500' : 'text-amberish-500')} /> {tx.label}</span>
+              <span className={cls('font-semibold', tx.ready ? 'text-mint-500' : 'text-amberish-500')}>{tx.ready ? 'Connected' : 'Not set'}</span>
+            </div>
+          </div>
+          <button onClick={onSettings} className="nav-item w-full">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/5"><Settings2 className="h-4 w-4" /></span>
+            <span className="flex-1 text-left">Settings</span>
+            <ChevronRight className="h-3.5 w-3.5 text-white/30" />
+          </button>
+          <div className="flex items-center gap-2 px-3 py-2 text-[10.5px] text-brand-200/60">
+            <LifeBuoy className="h-3.5 w-3.5" />
+            <span>All rows from both tabs, always</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ---------------- main ---------------- */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar route={route} state={state} onSettings={onSettings} setRoute={setRoute} />
+        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-16 pt-5 sm:px-6">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ route, state, onSettings, setRoute }) {
+  const titles = {
+    dashboard: ['Overview', 'Reconciliation health at a glance'],
+    upload: ['Import workbook', 'Drop a 2-tab GST workbook — vendors are extracted automatically'],
+    matching: ['Vendor matching', 'Review merged names, resolve fuzzy pairs, split mistakes'],
+    mapping: ['Mail ID mapping', 'Vendor Name ↔ Mail ID, exactly one relation per vendor'],
+    campaign: ['Preview & send', 'Summary email + full data attachment, per vendor'],
+  };
+  const [title, sub] = titles[route] || titles.dashboard;
+  const tx = transportStatus(state.settings);
+  const mapped = (state.vendors || []).filter((v) => v.recipients?.length).length;
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-ink-100/80 bg-white/80 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-ink-300">
+            <span>Workspace</span><ChevronRight className="h-3 w-3" /><span className="text-ink-500">{title}</span>
+          </div>
+          <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-ink-900">{title}</h1>
+        </div>
+
+        <div className="hidden items-center gap-2 md:flex">
+          <div className="flex items-center gap-2 rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-[11.5px] font-semibold text-ink-600 shadow-sm">
+            <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+            {state.loaded ? `${fmtInt(state.stats?.vendorCount)} vendors · ${compactINR((state.vendors || []).reduce((a, v) => a + Math.abs(v.gst || 0), 0))} GST` : 'No dataset'}
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-ink-100 bg-white px-3 py-1.5 text-[11.5px] font-semibold text-ink-600 shadow-sm">
+            <Mail className="h-3.5 w-3.5 text-brand-500" />
+            {fmtInt(mapped)} email-ready
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={cls('pill', tx.ready ? 'pill-green' : 'pill-amber')} title={tx.title}>
+            <span className={cls('h-1.5 w-1.5 rounded-full', tx.ready ? 'bg-emerald-500' : 'bg-amber-500')} />
+            {tx.ready ? `${tx.label} ready` : `${tx.label} setup`}
+          </span>
+          <button className="btn btn-sm" onClick={onSettings}><Settings2 className="h-3.5 w-3.5" /> Settings</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setRoute('campaign')}>
+            <Send className="h-3.5 w-3.5" /> Send
+          </button>
+        </div>
+      </div>
+      <div className={cls('h-[2px] bg-brand-line transition-all', state.loaded ? 'opacity-100' : 'opacity-30')} />
+    </header>
+  );
+}

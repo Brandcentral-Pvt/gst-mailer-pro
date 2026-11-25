@@ -1,0 +1,19 @@
+{
+  "path": "G:\\gst-mailer-pro\\gst-mailer-pro\\data\\workbook\\session.xlsx",
+  "filename": "FINAL GST DATA-1.xlsx",
+  "tabConfigs": [
+    {
+      "sheetName": "FINAL GST DATA",
+      "label": "FINAL GST DATA",
+      "headerRow": 0,
+      "vendorCol": "Vendor Name"
+    },
+    {
+      "sheetName": "GST 2B DATA",
+      "label": "GST 2B DATA",
+      "headerRow": 0,
+      "vendorCol": "Supplier Name"
+    }
+  ],
+  "savedAt": "2026-11-25T09:28:10.920Z"
+}
