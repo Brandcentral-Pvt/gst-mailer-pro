@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 import {
-  isLoaded, getStats, loadWorkbook, getVendorList, editMapping, rematchAll, getSuggestions,
+  isLoaded, getStats, loadWorkbook, clearWorkbook, getVendorList, editMapping, rematchAll, getSuggestions,
   buildSummaryFor, vendorSummary, getState,
 } from './dataset.js';
 import { peekWorkbook, detectHeaderRow, detectColumns } from './xlsx.js';
@@ -16,8 +16,8 @@ import {
   appendHistory, loadHistory,
 } from './store.js';
 import {
-  previewPayload, buildAttachment, startCampaign, cancelCampaign, getJob, jobSnapshot,
-  campaignCsv, attachmentFile, listJobs,
+  previewPayload, buildAttachment, startCampaign, cancelCampaign, cancelAllCampaigns, clearAttachmentCache,
+  getJob, jobSnapshot, campaignCsv, attachmentFile, listJobs,
 } from './campaign.js';
 import { testConnection, sendTestEmail } from './email.js';
 import {
@@ -149,6 +149,43 @@ api.post('/configure', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: err.message });
   }
+});
+
+function removeFilesIn(dir, keep = () => false) {
+  let removed = 0;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      if (keep(name)) continue;
+      const p = path.join(dir, name);
+      try {
+        if (fs.statSync(p).isFile()) { fs.unlinkSync(p); removed += 1; }
+      } catch { /* ignore a single locked/missing file */ }
+    }
+  } catch { /* directory not present yet */ }
+  return removed;
+}
+
+// Remove the active workbook without touching Mail IDs, settings or campaign history.
+api.delete('/workbook', (req, res) => {
+  const cancelled = cancelAllCampaigns();
+  clearWorkbook();
+  uploadStore.clear();
+
+  let sessionPath = '';
+  try { sessionPath = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'))?.path || ''; } catch { /* already gone */ }
+  if (sessionPath && sessionPath !== SESSION_FILE) {
+    try { if (fs.existsSync(sessionPath)) fs.unlinkSync(sessionPath); } catch { /* ignore */ }
+  }
+  const files = {
+    session: (() => { try { if (fs.existsSync(SESSION_FILE)) { fs.unlinkSync(SESSION_FILE); return 1; } } catch { /* ignore */ } return 0; })(),
+    backups: removeFilesIn(BACKUP_DIR),
+    uploads: removeFilesIn(UPLOADS),
+    attachments: clearAttachmentCache(),
+  };
+  res.json({
+    ok: true, loaded: false, cancelledJobs: cancelled, removedFiles: files,
+    settings: publicSettings(), recipients: Object.keys(loadRecipients()).length, history: loadHistory(),
+  });
 });
 
 api.get('/state', (req, res) => {

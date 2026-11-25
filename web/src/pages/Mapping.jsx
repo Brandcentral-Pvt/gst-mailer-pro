@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { Card, Badge, Avatar, Segmented, Modal, EmptyState, Spinner } from '../components/ui';
+import { StepCta } from '../components/Flow';
 import { fmtInt, EMAIL_RE, cls } from '../lib/format';
 
-export default function Mapping({ state, onVendors, toast, openVendor }) {
+export default function Mapping({ state, onVendors, toast, openVendor, setRoute }) {
   const vendors = state.vendors || [];
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
@@ -120,6 +121,22 @@ export default function Mapping({ state, onVendors, toast, openVendor }) {
         <Tile icon={AlertTriangle} tone="amber" label="Missing Mail ID" value={fmtInt(counts.missing)} sub="blocked from campaign" />
         <Tile icon={AlertTriangle} tone="rose" label="Invalid address" value={fmtInt(counts.invalid)} sub="fails email syntax" />
       </div>
+
+      <StepCta
+        icon={counts.missing + counts.invalid ? AlertTriangle : CircleCheck}
+        tone={counts.missing + counts.invalid ? 'amber' : 'green'}
+        title={counts.mapped === counts.all && counts.all > 0
+          ? 'Every vendor has a valid Mail ID'
+          : `${fmtInt(counts.missing + counts.invalid)} vendor(s) still need a Mail ID`}
+        body={counts.mapped === counts.all && counts.all > 0
+          ? 'Mapping is complete. Continue to preview an email and run a dry run.'
+          : 'Use bulk upload or paste a list below, then fix any remaining rows in the table.'}
+        cta={counts.mapped === counts.all && counts.all > 0 ? 'Continue to preview & send' : 'Show remaining'}
+        onClick={() => {
+          if (counts.mapped === counts.all && counts.all > 0) setRoute?.('campaign');
+          else setFilter(counts.missing ? 'missing' : 'invalid');
+        }}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <Card>
@@ -267,6 +284,19 @@ STORE TAG\tap@storetag.in`}</pre>
         <textarea className="textarea min-h-[220px]" value={pasteText} onChange={(e) => setPasteText(e.target.value)}
           placeholder={'DEELMO, accounts@deelmo.com\nCOLEBROOK, billing@colebrook.in, cc@yourcompany.com'} />
       </Modal>
+
+      {dirtyCount > 0 && (
+        <div className="sticky bottom-20 z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-brand-500/25 bg-white/95 p-3 shadow-lift backdrop-blur lg:bottom-4">
+          <span className="inline-flex items-center gap-2 text-[12px] font-semibold text-ink-700">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-50 text-[11px] font-extrabold text-brand-700">{dirtyCount}</span>
+            unsaved change{dirtyCount === 1 ? '' : 's'}
+          </span>
+          <button className="btn btn-ghost btn-sm ml-auto" onClick={() => setEdits({})}>Discard</button>
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>
+            {busy ? <Spinner /> : <Save className="h-3.5 w-3.5" />} Save changes
+          </button>
+        </div>
+      )}
     </div>
   );
 }

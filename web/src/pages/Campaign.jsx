@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Send, PlayCircle, Square, Download, RefreshCw, Mail, CheckCircle2, XCircle, Clock,
-  Search, ChevronRight, Paperclip, Terminal, History, MailCheck, MailX, Sparkles, FileDown,
-  Maximize2, X,
+  Send, PlayCircle, Square, Download, RefreshCw, Clock,
+  Search, Paperclip, History, MailCheck, MailX, FileDown,
+  Maximize2, X, Server,
 } from 'lucide-react';
 import api from '../lib/api';
-import { Card, Badge, Avatar, Progress, EmptyState, Spinner, Segmented } from '../components/ui';
+import { Card, Badge, Avatar, Progress, EmptyState, Spinner, Segmented, Modal } from '../components/ui';
+import { StepCta, flowSummary } from '../components/Flow';
 import { fmtInt, fmtINR, cls } from '../lib/format';
 
-export default function Campaign({ state, openVendor, openSettings, toast, refreshState }) {
+export default function Campaign({ state, openVendor, openSettings, toast, refreshState, setRoute }) {
   const vendors = state.vendors || [];
   const sendable = useMemo(() => vendors.filter((v) => v.recipients?.length && v.emailValid), [vendors]);
   const [selected, setSelected] = useState(() => new Set());
@@ -21,6 +22,7 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
   const [job, setJob] = useState(null);
   const [log, setLog] = useState([]);
   const [running, setRunning] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
   const streamRef = useRef(null);
   const logRef = useRef(null);
 
@@ -61,6 +63,7 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
     blocked: vendors.length - sendable.length,
     gst: sendable.reduce((a, v) => a + v.gst, 0),
   }), [vendors, sendable]);
+  const flow = useMemo(() => flowSummary(state), [state]);
 
   async function start(dryRun) {
     const list = [...selected].filter((name) => sendable.some((v) => v.vendor === name));
@@ -137,6 +140,32 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
         <MiniStat icon={Clock} label="Pace" value={`${state.settings?.smtp?.delaySeconds ?? 1.2}s`} sub="auto-tuned after a run" tone="ink" />
       </div>
 
+      <StepCta
+        icon={totals.blocked ? MailX : !flow.transportReady ? Server : PlayCircle}
+        tone={totals.blocked || !flow.transportReady ? 'amber' : 'brand'}
+        title={totals.blocked
+          ? `${fmtInt(totals.blocked)} vendor(s) cannot receive mail yet`
+          : !flow.transportReady
+            ? 'Email delivery is not set up'
+            : !flow.hasHistory
+              ? 'Step 4 · Run a dry run first'
+              : 'Delivery is ready'}
+        body={totals.blocked
+          ? 'Map the missing Mail IDs first — blocked vendors are excluded from every campaign.'
+          : !flow.transportReady
+            ? 'Add SMTP credentials or connect Gmail. Dry runs still work without delivery.'
+            : !flow.hasHistory
+              ? 'Build every attachment and check the preview without sending a single email.'
+              : `${fmtInt(totals.ready)} vendors and ${fmtInt(totals.rows)} attachment rows are ready.`}
+        cta={totals.blocked ? 'Map Mail IDs' : !flow.transportReady ? 'Open delivery settings' : !flow.hasHistory ? 'Run dry run' : 'Review & send'}
+        onClick={() => {
+          if (totals.blocked) setRoute?.('mapping');
+          else if (!flow.transportReady) openSettings('gmail');
+          else if (!flow.hasHistory) start(true);
+          else setConfirmSend(true);
+        }}
+      />
+
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         {/* ---------------- vendor picker ---------------- */}
         <Card className="flex max-h-[720px] flex-col">
@@ -208,7 +237,7 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
                     <Maximize2 className="h-3.5 w-3.5" /> Full view
                   </button>
                 )}
-                <button className="btn btn-sm btn-ghost" onClick={openSettings}>Edit template</button>
+                <button className="btn btn-sm btn-ghost" onClick={() => openSettings('template')}>Edit template</button>
               </div>
             </div>
             <div className="relative bg-ink-100/70 p-3">
@@ -244,7 +273,9 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
                 <button className="btn btn-sm" onClick={() => start(true)} disabled={running}>
                   <PlayCircle className="h-4 w-4" /> Dry run
                 </button>
-                <button className="btn btn-primary btn-sm" onClick={() => start(false)} disabled={running}>
+                <button className="btn btn-primary btn-sm" onClick={() => setConfirmSend(true)}
+                  disabled={running || !selected.size || !flow.transportReady}
+                  title={!flow.transportReady ? 'Configure SMTP or Gmail before sending' : !selected.size ? 'Select at least one vendor' : ''}>
                   <Send className="h-4 w-4" /> Send {fmtInt(selected.size)} mails
                 </button>
               </div>
@@ -330,6 +361,28 @@ export default function Campaign({ state, openVendor, openSettings, toast, refre
           </div>
         </div>
       )}
+
+      <Modal
+        open={confirmSend} onClose={() => setConfirmSend(false)}
+        title={`Send ${fmtInt(selected.size)} email${selected.size === 1 ? '' : 's'}?`}
+        subtitle="Each vendor gets a summary email and their own 2-tab Excel attachment."
+        footer={<>
+          <button className="btn" onClick={() => setConfirmSend(false)}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => { setConfirmSend(false); start(false); }} disabled={running}>
+            <Send className="h-4 w-4" /> Send now
+          </button>
+        </>}
+      >
+        <div className="space-y-2.5 text-[12.5px] text-ink-600">
+          <p><b className="text-ink-900">{fmtInt(totals.ready)}</b> vendors selected · <b className="text-ink-900">{fmtInt(totals.rows)}</b> attachment rows.</p>
+          <p>Delivery: <b className="text-ink-900">{state.settings?.deliveryMode === 'gmail' ? 'Gmail API' : 'SMTP'}</b>.</p>
+          {!flow.hasHistory && (
+            <div className="rounded-xl border border-amberish-500/25 bg-amberish-100/70 p-3 text-[12px] text-amber-800">
+              No campaign has run yet. A dry run is recommended first — it builds every attachment without delivering mail.
+            </div>
+          )}
+        </div>
+      </Modal>
 
     </div>
   );

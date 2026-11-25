@@ -3,6 +3,7 @@ import Shell from './components/Shell';
 import Settings from './components/Settings';
 import VendorDrawer from './components/VendorDrawer';
 import { Toasts } from './components/ui';
+import { RemoveWorkbookDialog } from './components/RemoveWorkbook';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Matching from './pages/Matching';
@@ -25,6 +26,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [flowDone, setFlowDone] = useState(() => new Set());
 
   const toast = useCallback((t) => {
     const id = ++toastSeq;
@@ -32,6 +35,18 @@ export default function App() {
     setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), 5600);
   }, []);
   const dismiss = (id) => setToasts((list) => list.filter((t) => t.id !== id));
+
+  const goTo = useCallback((key) => {
+    setRoute(key);
+    window.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }, []);
+  const markFlowDone = useCallback((key) => {
+    setFlowDone((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, []);
+  const openSettings = useCallback((tab = 'smtp') => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }, []);
 
   const refreshState = useCallback(async () => {
     try {
@@ -93,18 +108,39 @@ export default function App() {
       vendors: res.vendors,
       suggestions: res.suggestions || [],
     }));
+    markFlowDone('upload');
   };
 
   const onVendors = (res) => {
+    const nextVendors = res.vendors || state.vendors || [];
     setState((prev) => ({
       ...prev,
       vendors: res.vendors || prev.vendors,
       suggestions: res.suggestions ?? prev.suggestions,
     }));
+    if (nextVendors.length && nextVendors.every((v) => v.recipients?.length && v.emailValid)) {
+      markFlowDone('mapping');
+    }
   };
 
   const onSettingsSaved = (saved) => setState((prev) => ({ ...prev, settings: saved }));
   const onLoggedIn = (me) => { setUser(me); setAuthChecked(true); refreshState(); };
+
+  const onWorkbookRemoved = useCallback((res) => {
+    setState((prev) => ({
+      ...prev,
+      loaded: false,
+      stats: null,
+      vendors: [],
+      suggestions: [],
+      jobs: [],
+      history: res.history ?? prev.history,
+      settings: res.settings ?? prev.settings,
+    }));
+    setFlowDone(new Set());
+    setVendorOpen(null);
+    goTo('upload');
+  }, [goTo]);
 
   if (!authChecked) {
     return <div className="flex min-h-screen items-center justify-center bg-ink-950 text-[13px] font-semibold text-brand-200">Checking session…</div>;
@@ -115,25 +151,33 @@ export default function App() {
     <>
       <Shell
         route={route}
-        setRoute={setRoute}
+        setRoute={goTo}
         state={state}
-        onSettings={() => { setSettingsTab('smtp'); setSettingsOpen(true); }}
+        onSettings={() => openSettings('smtp')}
         user={user}
         onChangePassword={() => setPasswordOpen(true)}
         onLogout={async () => { await logout(); }}
+        onRemoveWorkbook={() => setRemoveOpen(true)}
+        flowDone={flowDone}
       >
-        {route === 'dashboard' && <Dashboard state={state} setRoute={setRoute} openVendor={setVendorOpen} />}
+        {route === 'dashboard' && (
+          <Dashboard state={state} setRoute={goTo} openVendor={setVendorOpen}
+            openSettings={openSettings} done={flowDone} />
+        )}
         {route === 'upload' && (
-          <Upload state={state} onLoaded={onLoaded} toast={toast} setRoute={setRoute} />
+          <Upload state={state} onLoaded={onLoaded} toast={toast} setRoute={goTo}
+            onRemoveWorkbook={() => setRemoveOpen(true)} />
         )}
         {route === 'matching' && (
-          <Matching state={state} onVendors={onVendors} toast={toast} openVendor={setVendorOpen} />
+          <Matching state={state} onVendors={onVendors} toast={toast} openVendor={setVendorOpen}
+            setRoute={goTo} onDone={markFlowDone} />
         )}
         {route === 'mapping' && (
-          <Mapping state={state} onVendors={onVendors} toast={toast} openVendor={setVendorOpen} />
+          <Mapping state={state} onVendors={onVendors} toast={toast} openVendor={setVendorOpen} setRoute={goTo} />
         )}
         {route === 'campaign' && (
-          <Campaign state={state} openVendor={setVendorOpen} openSettings={() => setSettingsOpen(true)} toast={toast} refreshState={refreshState} />
+          <Campaign state={state} openVendor={setVendorOpen} openSettings={openSettings}
+            toast={toast} refreshState={refreshState} setRoute={goTo} />
         )}
       </Shell>
 
@@ -146,6 +190,8 @@ export default function App() {
         toast={toast}
       />
       <VendorDrawer vendor={vendorOpen} onClose={() => setVendorOpen(null)} toast={toast} />
+      <RemoveWorkbookDialog open={removeOpen} onClose={() => setRemoveOpen(false)}
+        state={state} toast={toast} onRemoved={onWorkbookRemoved} />
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
       <Toasts items={toasts} dismiss={dismiss} />
     </>
