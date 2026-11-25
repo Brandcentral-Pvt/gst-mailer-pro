@@ -92,8 +92,12 @@ export function saveSettings(patch = {}) {
   if (patch.deliveryMode) current.deliveryMode = patch.deliveryMode === 'gmail' ? 'gmail' : 'smtp';
   if (patch.gmail && typeof patch.gmail === 'object') {
     const g = { ...patch.gmail };
-    // masked secrets must never overwrite a real stored value
+    // An explicit __clear list is the only way to erase a stored secret.
+    // A plain blank value still means "keep the saved one" (masked-field rule).
+    const clear = Array.isArray(g.__clear) ? g.__clear : [];
+    delete g.__clear;
     for (const key of ['clientSecret', 'refreshToken']) {
+      if (clear.includes(key)) { current.gmail[key] = ''; delete g[key]; continue; }
       if (g[key] === '••••••••') delete g[key];
       else if (g[key] !== undefined && !String(g[key]).trim()) delete g[key];
     }
@@ -116,6 +120,15 @@ export function saveSettings(patch = {}) {
   }
   writeJson('settings.json', current);
   return loadSettings();
+}
+
+// Disconnect = drop the Google grant and fall back to SMTP, but keep the
+// OAuth client ID/secret so reconnecting stays a one-click operation.
+export function clearGmailConnection() {
+  return saveSettings({
+    deliveryMode: 'smtp',
+    gmail: { __clear: ['refreshToken'], accountEmail: '' },
+  });
 }
 
 export function publicSettings() {

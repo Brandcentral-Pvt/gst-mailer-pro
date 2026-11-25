@@ -12,7 +12,7 @@ import {
 } from './dataset.js';
 import { peekWorkbook, detectHeaderRow, detectColumns } from './xlsx.js';
 import {
-  loadSettings, saveSettings, publicSettings, loadRecipients, saveRecipients,
+  loadSettings, saveSettings, publicSettings, clearGmailConnection, loadRecipients, saveRecipients,
   appendHistory, loadHistory,
 } from './store.js';
 import {
@@ -24,6 +24,7 @@ import {
   gmailAuthUrl, exchangeCode, checkGmailAuth, sendViaGmail, explainGmailError, gmailLimits,
 } from './gmail.js';
 import { parseEmails, EMAIL_RE, strictKeyLoose } from './util.js';
+import { createAuth } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -47,6 +48,8 @@ const uploadStore = new Map(); // fileId -> { path, filename, size, uploadedAt, 
 const SESSION_FILE = path.join(ROOT, 'data', 'session.json');
 const BACKUP_DIR = path.join(ROOT, 'data', 'workbook');
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+const auth = createAuth(path.join(ROOT, 'data'));
 
 const api = express.Router();
 
@@ -425,12 +428,7 @@ api.post('/gmail/test', async (req, res) => {
 });
 
 api.post('/gmail/disconnect', (req, res) => {
-  const settings = loadSettings();
-  saveSettings({
-    ...settings,
-    deliveryMode: 'smtp',
-    gmail: { ...settings.gmail, refreshToken: '', accountEmail: '' },
-  });
+  clearGmailConnection();
   res.json(publicSettings());
 });
 
@@ -546,7 +544,9 @@ api.get('/send/:id/log.csv', (req, res) => {
 api.get('/history', (req, res) => res.json({ history: loadHistory() }));
 
 // ------------------------------------------------------------------ SPA
-app.use('/api', api);
+// Auth endpoints stay public; everything else under /api requires a signed session cookie.
+app.use('/api/auth', auth.router);
+app.use('/api', auth.requireAuth, api);
 
 if (fs.existsSync(DIST)) {
   app.use(express.static(DIST));

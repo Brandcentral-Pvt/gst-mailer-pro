@@ -47,6 +47,15 @@ Open **http://localhost:8000** (production) or **http://localhost:5173** (dev).
 The last imported workbook is persisted in `data/workbook/` and restored on boot, so a restart
 does not lose your dataset or the Vendor ↔ Mail ID mapping.
 
+## Login & logout
+
+The app is single-user and protected by a signed, HttpOnly session cookie (7-day expiry, rate-limited
+logins). On first boot the server prints a generated `admin` password to its console — on the VPS run
+`pm2 logs gst-mailer-pro` to see it. Sign in, then use **Change password** (sidebar or top bar) to set
+your own; the first password must be changed before the workspace opens. **Sign out** is in both places.
+Every `/api/*` route except `/api/health` and `/api/auth/*` requires the session cookie. Credentials and
+session secrets live in `data/auth.json` (chmod 600 on Linux) — don't commit it.
+
 ---
 
 ## Screens

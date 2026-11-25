@@ -9,6 +9,7 @@ import Matching from './pages/Matching';
 import Mapping from './pages/Mapping';
 import Campaign from './pages/Campaign';
 import api from './lib/api';
+import { LoginScreen, ChangePasswordDialog, logout } from './components/Auth';
 
 let toastSeq = 0;
 
@@ -21,6 +22,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('smtp');
   const [vendorOpen, setVendorOpen] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const toast = useCallback((t) => {
     const id = ++toastSeq;
@@ -43,7 +47,27 @@ export default function App() {
     }
   }, [toast]);
 
-  useEffect(() => { refreshState(); }, [refreshState]);
+  useEffect(() => {
+    let cancelled = false;
+    const onUnauthorized = () => { setUser(null); setPasswordOpen(false); };
+    window.addEventListener('gst:unauthorized', onUnauthorized);
+    api.get('/api/auth/me')
+      .then((me) => {
+        if (cancelled) return;
+        setUser(me);
+        setAuthChecked(true);
+        refreshState();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUser(null);
+        setAuthChecked(true);
+      });
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gst:unauthorized', onUnauthorized);
+    };
+  }, [refreshState]);
 
   // Returning from the Google consent screen: /?gmail=connected | /?gmail=error&reason=…
   useEffect(() => {
@@ -80,6 +104,12 @@ export default function App() {
   };
 
   const onSettingsSaved = (saved) => setState((prev) => ({ ...prev, settings: saved }));
+  const onLoggedIn = (me) => { setUser(me); setAuthChecked(true); refreshState(); };
+
+  if (!authChecked) {
+    return <div className="flex min-h-screen items-center justify-center bg-ink-950 text-[13px] font-semibold text-brand-200">Checking session…</div>;
+  }
+  if (!user) return <LoginScreen onLoggedIn={onLoggedIn} />;
 
   return (
     <>
@@ -88,6 +118,9 @@ export default function App() {
         setRoute={setRoute}
         state={state}
         onSettings={() => { setSettingsTab('smtp'); setSettingsOpen(true); }}
+        user={user}
+        onChangePassword={() => setPasswordOpen(true)}
+        onLogout={async () => { await logout(); }}
       >
         {route === 'dashboard' && <Dashboard state={state} setRoute={setRoute} openVendor={setVendorOpen} />}
         {route === 'upload' && (
@@ -113,6 +146,7 @@ export default function App() {
         toast={toast}
       />
       <VendorDrawer vendor={vendorOpen} onClose={() => setVendorOpen(null)} toast={toast} />
+      <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
       <Toasts items={toasts} dismiss={dismiss} />
     </>
   );

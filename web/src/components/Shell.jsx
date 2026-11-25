@@ -1,9 +1,10 @@
 import React from 'react';
 import {
   LayoutDashboard, UploadCloud, GitMerge, AtSign, Send, Settings2, Database, Mail,
-  Sparkles, CircleDot, ChevronRight, LifeBuoy, FileSpreadsheet,
+  Sparkles, CircleDot, ChevronRight, LifeBuoy, FileSpreadsheet, KeyRound, LogOut,
 } from 'lucide-react';
 import { cls, fmtInt, compactINR } from '../lib/format';
+import { BrandLogo } from './Auth';
 
 const NAV = [
   { key: 'dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -27,7 +28,7 @@ function transportStatus(settings) {
   };
 }
 
-export default function Shell({ route, setRoute, state, children, onSettings }) {
+export default function Shell({ route, setRoute, state, children, onSettings, user, onChangePassword, onLogout }) {
   const { stats, loaded } = state;
   const mapped = (state.vendors || []).filter((v) => v.recipients?.length).length;
   const tx = transportStatus(state.settings);
@@ -37,10 +38,8 @@ export default function Shell({ route, setRoute, state, children, onSettings }) 
       {/* ---------------- sidebar ---------------- */}
       <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col bg-ink-950 bg-brand-sheen lg:flex">
         <div className="flex items-center gap-3 px-5 pb-5 pt-6">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="#7ee0ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M3 7l9 4 9-4" /><path d="M12 11v10" />
-            </svg>
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white p-1.5 ring-1 ring-white/15 backdrop-blur">
+            <BrandLogo className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0">
             <p className="font-display text-[15px] font-extrabold tracking-tight text-white">GST Ledger</p>
@@ -111,6 +110,14 @@ export default function Shell({ route, setRoute, state, children, onSettings }) 
             <span className="flex-1 text-left">Settings</span>
             <ChevronRight className="h-3.5 w-3.5 text-white/30" />
           </button>
+          <button onClick={onChangePassword} className="nav-item w-full">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/5"><KeyRound className="h-4 w-4" /></span>
+            <span className="flex-1 text-left">Change password</span>
+          </button>
+          <button onClick={onLogout} className="nav-item w-full">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/5"><LogOut className="h-4 w-4" /></span>
+            <span className="flex-1 text-left">Sign out</span>
+          </button>
           <div className="flex items-center gap-2 px-3 py-2 text-[10.5px] text-brand-200/60">
             <LifeBuoy className="h-3.5 w-3.5" />
             <span>All rows from both tabs, always</span>
@@ -120,14 +127,15 @@ export default function Shell({ route, setRoute, state, children, onSettings }) 
 
       {/* ---------------- main ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar route={route} state={state} onSettings={onSettings} setRoute={setRoute} />
+        <TopBar route={route} state={state} onSettings={onSettings} setRoute={setRoute}
+          user={user} onChangePassword={onChangePassword} onLogout={onLogout} />
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-16 pt-5 sm:px-6">{children}</main>
       </div>
     </div>
   );
 }
 
-function TopBar({ route, state, onSettings, setRoute }) {
+function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, onLogout }) {
   const titles = {
     dashboard: ['Overview', 'Reconciliation health at a glance'],
     upload: ['Import workbook', 'Drop a 2-tab GST workbook — vendors are extracted automatically'],
@@ -165,6 +173,11 @@ function TopBar({ route, state, onSettings, setRoute }) {
             <span className={cls('h-1.5 w-1.5 rounded-full', tx.ready ? 'bg-emerald-500' : 'bg-amber-500')} />
             {tx.ready ? `${tx.label} ready` : `${tx.label} setup`}
           </span>
+          <span className="hidden text-[11.5px] font-semibold text-ink-500 sm:inline" title={`Signed in as ${user?.username || 'admin'}`}>
+            {user?.username || 'admin'}
+          </span>
+          <button className="btn btn-sm !px-2" onClick={onChangePassword} title="Change password"><KeyRound className="h-3.5 w-3.5" /></button>
+          <button className="btn btn-sm !px-2" onClick={onLogout} title="Sign out"><LogOut className="h-3.5 w-3.5" /></button>
           <button className="btn btn-sm" onClick={onSettings}><Settings2 className="h-3.5 w-3.5" /> Settings</button>
           <button className="btn btn-primary btn-sm" onClick={() => setRoute('campaign')}>
             <Send className="h-3.5 w-3.5" /> Send
