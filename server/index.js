@@ -44,10 +44,60 @@ const upload = multer({
   },
 });
 
-const uploadStore = new Map(); // fileId -> { path, filename, size, uploadedAt, cache }
+const uploadStore = new Map(); // fileId -> { path, filename, size, uploadedAt }
+const UPLOAD_TTL_MS = 2 * 60 * 60 * 1000; // staged uploads expire after 2 hours
 const SESSION_FILE = path.join(ROOT, 'data', 'session.json');
 const BACKUP_DIR = path.join(ROOT, 'data', 'workbook');
 fs.mkdirSync(BACKUP_DIR, { recursive: true });
+
+const metaPathFor = (fileId) => path.join(UPLOADS, `${fileId}.json`);
+
+function saveUploadMeta(fileId, meta) {
+  try { fs.writeFileSync(metaPathFor(fileId), JSON.stringify(meta)); } catch { /* non-fatal */ }
+}
+
+// Re-attach staged files after a restart so an upload in the browser still configures.
+function restoreUploads() {
+  let restored = 0;
+  try {
+    for (const name of fs.readdirSync(UPLOADS)) {
+      if (!/\.(xlsx|xlsm|csv)$/i.test(name)) continue;
+      const fileId = path.basename(name, path.extname(name));
+      const p = path.join(UPLOADS, name);
+      let meta = {};
+      try { meta = JSON.parse(fs.readFileSync(metaPathFor(fileId), 'utf8')); } catch { /* older upload */ }
+      try {
+        const st = fs.statSync(p);
+        uploadStore.set(fileId, {
+          path: p,
+          filename: meta.filename || path.basename(name),
+          size: meta.size || st.size,
+          uploadedAt: meta.uploadedAt || st.mtime.toISOString(),
+        });
+        restored += 1;
+      } catch { /* skip a broken file */ }
+    }
+  } catch { /* no uploads yet */ }
+  return restored;
+}
+
+// Only remove files that are no longer staged and have gone stale — never touch an in-flight upload.
+function pruneStaleUploads() {
+  let removed = 0;
+  const now = Date.now();
+  try {
+    for (const name of fs.readdirSync(UPLOADS)) {
+      const fileId = name.replace(/\.(xlsx|xlsm|csv|json)$/i, '');
+      if (uploadStore.has(fileId)) continue;
+      const p = path.join(UPLOADS, name);
+      let mtimeMs = 0;
+      try { mtimeMs = fs.statSync(p).mtimeMs; } catch { continue; }
+      if (now - mtimeMs <= UPLOAD_TTL_MS) continue;
+      try { fs.unlinkSync(p); removed += 1; } catch { /* ignore a single locked file */ }
+    }
+  } catch { /* no uploads yet */ }
+  return removed;
+}
 
 const auth = createAuth(path.join(ROOT, 'data'));
 
@@ -67,6 +117,13 @@ api.post('/upload', upload.single('file'), async (req, res) => {
   const dest = path.join(UPLOADS, `${fileId}${ext}`);
   fs.renameSync(req.file.path, dest);
   const isCsv = ext === '.csv';
+  const uploadedAt = new Date().toISOString();
+  const size = fs.statSync(dest).size;
+  // Register before reading: another upload must never prune an in-flight file.
+  uploadStore.set(fileId, { path: dest, filename: req.file.originalname, size, uploadedAt });
+  saveUploadMeta(fileId, { filename: req.file.originalname, size, uploadedAt, isCsv });
+  pruneStaleUploads();
+
   try {
     let sheets;
     if (isCsv) {
@@ -103,14 +160,16 @@ api.post('/upload', upload.single('file'), async (req, res) => {
         };
       });
     }
-    uploadStore.set(fileId, { path: dest, filename: req.file.originalname, size: fs.statSync(dest).size, uploadedAt: new Date().toISOString() });
-    // single-user app: keep only the file that was just uploaded
-    fs.readdirSync(UPLOADS).filter((f) => !f.startsWith(fileId)).forEach((f) => {
-      try { fs.unlinkSync(path.join(UPLOADS, f)); } catch { /* ignore */ }
-    });
-    res.json({ fileId, filename: req.file.originalname, sizeKb: Math.round(fs.statSync(dest).size / 1024), isCsv, sheets });
+    res.json({ fileId, filename: req.file.originalname, sizeKb: Math.round(size / 1024), isCsv, sheets });
   } catch (err) {
-    res.status(422).json({ error: `Could not read workbook: ${err.message}` });
+    const stillStaged = fs.existsSync(dest);
+    uploadStore.delete(fileId);
+    try { fs.unlinkSync(dest); } catch { /* already gone */ }
+    try { fs.unlinkSync(metaPathFor(fileId)); } catch { /* already gone */ }
+    const message = stillStaged
+      ? `Could not read workbook: ${err.message}`
+      : 'The upload was interrupted by another file. Please try again.';
+    res.status(422).json({ error: message });
   }
 });
 
@@ -120,6 +179,10 @@ api.post('/configure', async (req, res) => {
   if (!fileId || !Array.isArray(tabs) || !tabs.length) return fail(res, 400, 'fileId and tabs are required');
   const meta = uploadStore.get(fileId);
   if (!meta) return fail(res, 404, 'Upload expired — please upload the workbook again');
+  if (!fs.existsSync(meta.path)) {
+    uploadStore.delete(fileId);
+    return fail(res, 410, 'That upload is no longer available — please upload the workbook again');
+  }
   try {
     const tabConfigs = tabs.map((t, i) => ({
       sheetName: t.sheetName,
@@ -147,6 +210,10 @@ api.post('/configure', async (req, res) => {
       suggestions: getSuggestions(),
     });
   } catch (err) {
+    if (/ENOENT|no such file/i.test(String(err.message))) {
+      uploadStore.delete(fileId);
+      return fail(res, 410, 'That upload is no longer available — please upload the workbook again');
+    }
     res.status(422).json({ error: err.message });
   }
 });
@@ -617,5 +684,10 @@ async function restoreSession() {
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`GST Vendor Mailer Pro API on http://0.0.0.0:${PORT}`);
+  const restoredUploads = restoreUploads();
+  const prunedUploads = pruneStaleUploads();
+  if (restoredUploads || prunedUploads) {
+    console.log(`[boot] uploads: restored ${restoredUploads}, pruned ${prunedUploads}`);
+  }
   await restoreSession();
 });
