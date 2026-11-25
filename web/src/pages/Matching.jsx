@@ -6,9 +6,10 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { Card, Badge, Avatar, Segmented, Modal, Spinner } from '../components/ui';
+import { StepCta } from '../components/Flow';
 import { fmtInt, cls } from '../lib/format';
 
-export default function Matching({ state, onVendors, toast, openVendor }) {
+export default function Matching({ state, onVendors, toast, openVendor, setRoute, onDone }) {
   const vendors = state.vendors || [];
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
@@ -93,6 +94,17 @@ export default function Matching({ state, onVendors, toast, openVendor }) {
         <KpiCard icon={Sparkles} label="Fuzzy to review" value={fmtInt(counts.review)} sub="similar names auto-grouped" tone="amber" />
         <KpiCard icon={AlertCircle} label="Single-tab vendors" value={fmtInt(counts.missing)} sub="no rows on the other sheet" tone="rose" />
       </div>
+
+      <StepCta
+        icon={CheckCheck}
+        tone={(state.suggestions || []).length + counts.review ? 'amber' : 'green'}
+        title={(state.suggestions || []).length + counts.review
+          ? `${fmtInt((state.suggestions || []).length + counts.review)} close name match(es) worth a look`
+          : 'Vendor names look good'}
+        body="Approve suggested merges above, or continue if the current grouping is correct — you can always come back."
+        cta="Continue to Mail IDs"
+        onClick={() => { onDone?.('matching'); setRoute?.('mapping'); }}
+      />
 
       {(state.suggestions || []).length > 0 && (
         <Card>

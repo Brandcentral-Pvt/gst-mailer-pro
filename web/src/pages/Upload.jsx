@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import { Card, Badge, Spinner } from '../components/ui';
+import { StepCta } from '../components/Flow';
 import { fmtInt, cls } from '../lib/format';
 
 const VENDOR_HINTS = [
@@ -99,11 +100,21 @@ export default function Upload({ state, onLoaded, toast, setRoute, openSettings 
 
   return (
     <div className="space-y-5">
+      {state.loaded && (
+        <StepCta
+          icon={ArrowRight}
+          tone="green"
+          title="A workbook is already loaded"
+          body={`${state.stats.filename} · ${fmtInt(state.stats.vendorCount)} vendors. Continue from where you left off.`}
+          cta="Continue to review"
+          onClick={() => setRoute('matching')}
+        />
+      )}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="relative overflow-hidden">
           <div className="card-hd">
             <div>
-              <p className="card-title">Import a 2-tab GST workbook</p>
+              <p className="card-title">Step 1 · Import a 2-tab GST workbook</p>
               <p className="card-sub">Example: Purchase Register + GSTR-2B Portal. Header rows and the Vendor Name column are auto-detected.</p>
             </div>
             {upload && <Badge tone="teal" className="ml-auto">{upload.filename}</Badge>}

@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, UploadCloud, GitMerge, AtSign, Send, Settings2, Database, Mail,
-  Sparkles, CircleDot, ChevronRight, LifeBuoy, FileSpreadsheet, KeyRound, LogOut,
+  Sparkles, CircleDot, ChevronRight, ChevronDown, LifeBuoy, FileSpreadsheet, KeyRound, LogOut,
 } from 'lucide-react';
-import { cls, fmtInt, compactINR } from '../lib/format';
+import { cls, fmtInt, compactINR, initials, avatarGradient } from '../lib/format';
 import { BrandLogo } from './Auth';
+import { FlowSteps } from './Flow';
 
 const NAV = [
-  { key: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-  { key: 'upload', label: 'Import workbook', icon: UploadCloud },
-  { key: 'matching', label: 'Vendor matching', icon: GitMerge },
-  { key: 'mapping', label: 'Mail ID mapping', icon: AtSign },
-  { key: 'campaign', label: 'Preview & send', icon: Send },
+  { key: 'dashboard', label: 'Overview', short: 'Home', icon: LayoutDashboard },
+  { key: 'upload', label: 'Import workbook', short: 'Import', icon: UploadCloud },
+  { key: 'matching', label: 'Vendor matching', short: 'Match', icon: GitMerge },
+  { key: 'mapping', label: 'Mail ID mapping', short: 'Mail IDs', icon: AtSign },
+  { key: 'campaign', label: 'Preview & send', short: 'Send', icon: Send },
 ];
 
 function transportStatus(settings) {
@@ -28,7 +29,7 @@ function transportStatus(settings) {
   };
 }
 
-export default function Shell({ route, setRoute, state, children, onSettings, user, onChangePassword, onLogout }) {
+export default function Shell({ route, setRoute, state, children, onSettings, user, onChangePassword, onLogout, flowDone }) {
   const { stats, loaded } = state;
   const mapped = (state.vendors || []).filter((v) => v.recipients?.length).length;
   const tx = transportStatus(state.settings);
@@ -51,7 +52,8 @@ export default function Shell({ route, setRoute, state, children, onSettings, us
           {NAV.map(({ key, label, icon: Icon }) => {
             const active = route === key;
             return (
-              <button key={key} onClick={() => setRoute(key)} className={cls('nav-item w-full', active && 'nav-item-active')}>
+              <button key={key} onClick={() => setRoute(key)} aria-current={active ? 'page' : undefined}
+                className={cls('nav-item w-full', active && 'nav-item-active')}>
                 <span className={cls('grid h-7 w-7 place-items-center rounded-lg bg-white/5', active && 'bg-white/15')}>
                   <Icon className="h-4 w-4" />
                 </span>
@@ -129,7 +131,13 @@ export default function Shell({ route, setRoute, state, children, onSettings, us
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar route={route} state={state} onSettings={onSettings} setRoute={setRoute}
           user={user} onChangePassword={onChangePassword} onLogout={onLogout} />
-        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-16 pt-5 sm:px-6">{children}</main>
+        <div className="border-b border-ink-100/80 bg-white/70">
+          <div className="mx-auto w-full max-w-[1440px] px-4 py-2 sm:px-6">
+            <FlowSteps state={state} route={route} setRoute={setRoute} done={flowDone} />
+          </div>
+        </div>
+        <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-5 sm:px-6 lg:pb-16">{children}</main>
+        <MobileNav route={route} setRoute={setRoute} />
       </div>
     </div>
   );
@@ -173,12 +181,12 @@ function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, on
             <span className={cls('h-1.5 w-1.5 rounded-full', tx.ready ? 'bg-emerald-500' : 'bg-amber-500')} />
             {tx.ready ? `${tx.label} ready` : `${tx.label} setup`}
           </span>
-          <span className="hidden text-[11.5px] font-semibold text-ink-500 sm:inline" title={`Signed in as ${user?.username || 'admin'}`}>
-            {user?.username || 'admin'}
-          </span>
-          <button className="btn btn-sm !px-2" onClick={onChangePassword} title="Change password"><KeyRound className="h-3.5 w-3.5" /></button>
-          <button className="btn btn-sm !px-2" onClick={onLogout} title="Sign out"><LogOut className="h-3.5 w-3.5" /></button>
-          <button className="btn btn-sm" onClick={onSettings}><Settings2 className="h-3.5 w-3.5" /> Settings</button>
+          <AccountMenu
+            user={user}
+            onSettings={onSettings}
+            onChangePassword={onChangePassword}
+            onLogout={onLogout}
+          />
           <button className="btn btn-primary btn-sm" onClick={() => setRoute('campaign')}>
             <Send className="h-3.5 w-3.5" /> Send
           </button>
@@ -186,5 +194,83 @@ function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, on
       </div>
       <div className={cls('h-[2px] bg-brand-line transition-all', state.loaded ? 'opacity-100' : 'opacity-30')} />
     </header>
+  );
+}
+
+function AccountMenu({ user, onSettings, onChangePassword, onLogout }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const name = user?.username || 'admin';
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onClick = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [open]);
+
+  const run = (fn) => () => { setOpen(false); fn?.(); };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}
+        aria-label="Account menu"
+        className="flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-2 py-1.5 text-[12px] font-semibold text-ink-600 shadow-sm transition hover:bg-ink-50">
+        <span className={cls('grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br text-[10px] font-extrabold text-white', avatarGradient(name))}>
+          {initials(name) || 'A'}
+        </span>
+        <span className="hidden sm:inline">{name}</span>
+        <ChevronDown className={cls('h-3.5 w-3.5 text-ink-400 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-ink-100 bg-white p-1.5 shadow-lift">
+          <div className="border-b border-ink-100 px-2.5 py-2">
+            <p className="text-[12px] font-bold text-ink-900">{name}</p>
+            <p className="text-[10.5px] text-ink-400">Signed in · session lasts 7 days</p>
+          </div>
+          <button role="menuitem" onClick={run(onSettings)} className="menu-item mt-1">
+            <Settings2 className="h-3.5 w-3.5 text-ink-400" /> Settings
+          </button>
+          <button role="menuitem" onClick={run(onChangePassword)} className="menu-item">
+            <KeyRound className="h-3.5 w-3.5 text-ink-400" /> Change password
+          </button>
+          <div className="my-1 h-px bg-ink-100" />
+          <button role="menuitem" onClick={run(onLogout)} className="menu-item !text-rose-600">
+            <LogOut className="h-3.5 w-3.5" /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileNav({ route, setRoute }) {
+  return (
+    <nav aria-label="Main navigation"
+      className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+      <div className="grid grid-cols-5">
+        {NAV.map(({ key, label, short, icon: Icon }) => {
+          const active = route === key;
+          return (
+            <button key={key} onClick={() => setRoute(key)} aria-current={active ? 'page' : undefined}
+              aria-label={label}
+              className={cls(
+                'flex min-h-[58px] flex-col items-center justify-center gap-1 px-1 text-[10px] font-semibold transition',
+                active ? 'text-brand-700' : 'text-ink-400',
+              )}>
+              <span className={cls('grid h-7 w-7 place-items-center rounded-lg', active && 'bg-brand-50')}>
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="max-w-full truncate">{short || label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

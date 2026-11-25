@@ -2,18 +2,19 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Rows3, BadgeIndianRupee, AtSign, GitMerge, AlertTriangle, ArrowUpRight,
-  UploadCloud, Send, Sparkles, TrendingUp, CheckCircle2, FileSpreadsheet, ChevronRight,
+  UploadCloud, Send, Sparkles, ChevronRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
   PieChart, Pie,
 } from 'recharts';
 import { Card, Badge, Avatar, EmptyState } from '../components/ui';
+import { NextStepCard } from '../components/Flow';
 import { fmtInt, fmtINR, compactINR, timeAgo } from '../lib/format';
 
 const STATUS_COLORS = { Matched: '#19c37d', Unmatched: '#ef4444', 'Value Mismatch': '#f59e0b' };
 
-export default function Dashboard({ state, setRoute, openVendor }) {
+export default function Dashboard({ state, setRoute, openVendor, openSettings, done }) {
   const vendors = state.vendors || [];
   const stats = state.stats;
 
@@ -49,7 +50,7 @@ export default function Dashboard({ state, setRoute, openVendor }) {
   if (!state.loaded) {
     return (
       <div className="space-y-5">
-        <HeroBanner setRoute={setRoute} />
+        <NextStepCard state={state} done={done} setRoute={setRoute} openSettings={openSettings} />
         <div className="grid gap-4 lg:grid-cols-3">
           {[
             { icon: UploadCloud, title: '1 · Import a 2-tab workbook', body: 'Purchase register + GSTR-2B portal export. Vendor names, GSTINs and ₹ amounts are detected automatically.', cta: 'Import workbook', route: 'upload' },
@@ -76,6 +77,7 @@ export default function Dashboard({ state, setRoute, openVendor }) {
 
   return (
     <div className="space-y-5">
+      <NextStepCard state={state} done={done} setRoute={setRoute} openSettings={openSettings} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={Users} label="Matched vendors" value={fmtInt(stats.vendorCount)} sub={`from ${fmtInt(stats.rawNameCount)} raw names`} tone="brand" />
         <Stat icon={Rows3} label="Records in scope" value={fmtInt(totals.rows)} sub={`${stats.tabs.map((t) => fmtInt(t.rows)).join(' + ')} rows`} tone="ink" />
@@ -257,50 +259,6 @@ export default function Dashboard({ state, setRoute, openVendor }) {
           <EmptyState icon={Send} title="No campaigns yet" hint="Run a dry run from Preview & send to validate attachments before delivering mail." />
         )}
       </Card>
-    </div>
-  );
-}
-
-function HeroBanner({ setRoute }) {
-  return (
-    <div className="relative overflow-hidden rounded-3xl bg-brand-sheen p-6 text-white shadow-lift sm:p-8">
-      <div className="absolute inset-0 bg-grid-fade opacity-70" />
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
-        <div className="min-w-0 flex-1">
-          <span className="pill bg-white/10 text-brand-100 ring-1 ring-white/15">
-            <Sparkles className="h-3.5 w-3.5" /> 2-tab reconciliation · zero filtering
-          </span>
-          <h2 className="mt-3 font-display text-[26px] font-extrabold leading-tight tracking-tight sm:text-[32px]">
-            Every vendor. Every row.<br />One clean GST statement.
-          </h2>
-          <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-brand-100/85">
-            Import your purchase register and GSTR-2B export, let the matcher reconcile vendor names,
-            then mail each party a summary plus their complete transaction workbook.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button onClick={() => setRoute('upload')} className="btn btn-lg border-0 bg-white text-brand-800 hover:bg-brand-50">
-              <UploadCloud className="h-4 w-4" /> Import workbook
-            </button>
-            <button onClick={() => setRoute('campaign')} className="btn btn-lg border-white/20 bg-white/10 text-white hover:bg-white/15">
-              <Send className="h-4 w-4" /> Preview emails
-            </button>
-          </div>
-        </div>
-        <div className="grid w-full max-w-sm grid-cols-2 gap-2.5">
-          {[
-            { icon: Users, k: '1 file', v: 'both tabs imported' },
-            { icon: Rows3, k: '∞ rows', v: 'nothing filtered out' },
-            { icon: CheckCircle2, k: '1 mail', v: 'per vendor' },
-            { icon: TrendingUp, k: '₹', v: 'Indian formatting' },
-          ].map((x) => (
-            <div key={x.v} className="rounded-xl border border-white/15 bg-white/[.07] p-3 backdrop-blur">
-              <x.icon className="h-4 w-4 text-brand-200" />
-              <p className="mt-2 font-display text-xl font-extrabold">{x.k}</p>
-              <p className="text-[10.5px] uppercase tracking-wide text-brand-200/70">{x.v}</p>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

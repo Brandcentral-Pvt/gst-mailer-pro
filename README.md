@@ -56,6 +56,14 @@ your own; the first password must be changed before the workspace opens. **Sign 
 Every `/api/*` route except `/api/health` and `/api/auth/*` requires the session cookie. Credentials and
 session secrets live in `data/auth.json` (chmod 600 on Linux) — don't commit it.
 
+## Guided workflow
+
+The top of every screen shows the same four-step strip — **Import → Review names → Mail IDs → Send** —
+with live counts and completed steps checked off. Each screen also has a single next-action card, so you
+can continue without hunting for the right button. On small screens the same steps live in a bottom nav,
+and account actions (settings, password, sign out) are grouped in the top-right avatar menu. Live sends
+ask for one final confirmation; dry runs never do.
+
 ---
 
 ## Screens
