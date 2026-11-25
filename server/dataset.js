@@ -20,6 +20,19 @@ export function isLoaded() { return state.loaded; }
 
 export function getState() { return state; }
 
+/** Clear the active dataset in place so importers that hold `getState()` see the reset. */
+export function clearWorkbook() {
+  state.loaded = false;
+  state.fileId = '';
+  state.filename = '';
+  state.loadedAt = '';
+  state.tabs = [];
+  state.mapping = {};
+  state.meta = {};
+  state.vendors = new Map();
+  state.rawCounts = {};
+}
+
 function dateRangeOf(rows, col) {
   if (!col) return '—';
   let min = null; let max = null;

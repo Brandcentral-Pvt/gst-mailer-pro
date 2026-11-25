@@ -274,6 +274,30 @@ export function cancelCampaign(id) {
   return true;
 }
 
+/** Stop every in-flight job before its dataset is cleared. */
+export function cancelAllCampaigns() {
+  let cancelled = 0;
+  jobs.forEach((job) => {
+    if (job.status === 'running') { job.cancelRequested = true; cancelled += 1; }
+  });
+  return cancelled;
+}
+
+/** Generated workbooks are disposable — wipe them so no stale vendor file is downloadable. */
+export function clearAttachmentCache() {
+  let cleared = 0;
+  try {
+    for (const name of fs.readdirSync(ATTACH_DIR)) {
+      const p = path.join(ATTACH_DIR, name);
+      try {
+        if (fs.statSync(p).isFile()) { fs.unlinkSync(p); cleared += 1; }
+      } catch { /* ignore a single bad file */ }
+    }
+  } catch { /* no cache yet */ }
+  try { fs.writeFileSync(path.join(ATTACH_DIR, '.mode'), ''); } catch { /* ignore */ }
+  return cleared;
+}
+
 export function subscribe(id, fn) {
   const job = jobs.get(id);
   if (!job) return () => {};

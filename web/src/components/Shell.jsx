@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, UploadCloud, GitMerge, AtSign, Send, Settings2, Database, Mail,
-  Sparkles, CircleDot, ChevronRight, ChevronDown, LifeBuoy, FileSpreadsheet, KeyRound, LogOut,
+  Sparkles, CircleDot, ChevronRight, ChevronDown, LifeBuoy, FileSpreadsheet, KeyRound, LogOut, Trash2,
 } from 'lucide-react';
 import { cls, fmtInt, compactINR, initials, avatarGradient } from '../lib/format';
 import { BrandLogo } from './Auth';
@@ -29,7 +29,7 @@ function transportStatus(settings) {
   };
 }
 
-export default function Shell({ route, setRoute, state, children, onSettings, user, onChangePassword, onLogout, flowDone }) {
+export default function Shell({ route, setRoute, state, children, onSettings, user, onChangePassword, onLogout, onRemoveWorkbook, flowDone }) {
   const { stats, loaded } = state;
   const mapped = (state.vendors || []).filter((v) => v.recipients?.length).length;
   const tx = transportStatus(state.settings);
@@ -81,9 +81,14 @@ export default function Shell({ route, setRoute, state, children, onSettings, us
                   <span className="text-[13px] font-bold text-white">{fmtInt(stats?.totalRows)}</span>
                 </div>
               </div>
-              <button onClick={() => setRoute('upload')} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/10 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/15">
-                <FileSpreadsheet className="h-3.5 w-3.5" /> Replace workbook
-              </button>
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <button onClick={() => setRoute('upload')} className="flex items-center justify-center gap-1.5 rounded-lg bg-white/10 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/15">
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Replace
+                </button>
+                <button onClick={onRemoveWorkbook} className="flex items-center justify-center gap-1.5 rounded-lg border border-rose-300/25 bg-rose-400/10 px-2 py-1.5 text-[11px] font-semibold text-rose-100 transition hover:bg-rose-400/20">
+                  <Trash2 className="h-3.5 w-3.5" /> Remove
+                </button>
+              </div>
             </>
           ) : (
             <button onClick={() => setRoute('upload')} className="mt-2 w-full rounded-lg bg-brand-400/20 px-2 py-2 text-[11.5px] font-semibold text-brand-100 transition hover:bg-brand-400/30">
@@ -130,7 +135,8 @@ export default function Shell({ route, setRoute, state, children, onSettings, us
       {/* ---------------- main ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar route={route} state={state} onSettings={onSettings} setRoute={setRoute}
-          user={user} onChangePassword={onChangePassword} onLogout={onLogout} />
+          user={user} onChangePassword={onChangePassword} onLogout={onLogout}
+          onRemoveWorkbook={onRemoveWorkbook} />
         <div className="border-b border-ink-100/80 bg-white/70">
           <div className="mx-auto w-full max-w-[1440px] px-4 py-2 sm:px-6">
             <FlowSteps state={state} route={route} setRoute={setRoute} done={flowDone} />
@@ -143,7 +149,7 @@ export default function Shell({ route, setRoute, state, children, onSettings, us
   );
 }
 
-function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, onLogout }) {
+function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, onLogout, onRemoveWorkbook }) {
   const titles = {
     dashboard: ['Overview', 'Reconciliation health at a glance'],
     upload: ['Import workbook', 'Drop a 2-tab GST workbook — vendors are extracted automatically'],
@@ -183,9 +189,11 @@ function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, on
           </span>
           <AccountMenu
             user={user}
+            state={state}
             onSettings={onSettings}
             onChangePassword={onChangePassword}
             onLogout={onLogout}
+            onRemoveWorkbook={onRemoveWorkbook}
           />
           <button className="btn btn-primary btn-sm" onClick={() => setRoute('campaign')}>
             <Send className="h-3.5 w-3.5" /> Send
@@ -197,7 +205,7 @@ function TopBar({ route, state, onSettings, setRoute, user, onChangePassword, on
   );
 }
 
-function AccountMenu({ user, onSettings, onChangePassword, onLogout }) {
+function AccountMenu({ user, state, onSettings, onChangePassword, onLogout, onRemoveWorkbook }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const name = user?.username || 'admin';
@@ -239,6 +247,11 @@ function AccountMenu({ user, onSettings, onChangePassword, onLogout }) {
           <button role="menuitem" onClick={run(onChangePassword)} className="menu-item">
             <KeyRound className="h-3.5 w-3.5 text-ink-400" /> Change password
           </button>
+          {state?.loaded && (
+            <button role="menuitem" onClick={run(onRemoveWorkbook)} className="menu-item !text-rose-600">
+              <Trash2 className="h-3.5 w-3.5" /> Remove workbook
+            </button>
+          )}
           <div className="my-1 h-px bg-ink-100" />
           <button role="menuitem" onClick={run(onLogout)} className="menu-item !text-rose-600">
             <LogOut className="h-3.5 w-3.5" /> Sign out

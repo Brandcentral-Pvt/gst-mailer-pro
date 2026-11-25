@@ -7,6 +7,7 @@ import {
 import api from '../lib/api';
 import { Card, Badge, Spinner } from '../components/ui';
 import { StepCta } from '../components/Flow';
+import { RemoveWorkbookButton } from '../components/RemoveWorkbook';
 import { fmtInt, cls } from '../lib/format';
 
 const VENDOR_HINTS = [
@@ -31,7 +32,7 @@ export function guessVendorCol(columns = []) {
   return fallback || columns[0];
 }
 
-export default function Upload({ state, onLoaded, toast, setRoute, openSettings }) {
+export default function Upload({ state, onLoaded, toast, setRoute, onRemoveWorkbook, openSettings }) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState(null);
@@ -101,14 +102,22 @@ export default function Upload({ state, onLoaded, toast, setRoute, openSettings 
   return (
     <div className="space-y-5">
       {state.loaded && (
-        <StepCta
-          icon={ArrowRight}
-          tone="green"
-          title="A workbook is already loaded"
-          body={`${state.stats.filename} · ${fmtInt(state.stats.vendorCount)} vendors. Continue from where you left off.`}
-          cta="Continue to review"
-          onClick={() => setRoute('matching')}
-        />
+        <>
+          <StepCta
+            icon={ArrowRight}
+            tone="green"
+            title="A workbook is already loaded"
+            body={`${state.stats.filename} · ${fmtInt(state.stats.vendorCount)} vendors. Continue from where you left off.`}
+            cta="Continue to review"
+            onClick={() => setRoute('matching')}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-ink-100 bg-white px-3.5 py-2.5">
+            <p className="text-[11.5px] text-ink-500">
+              Need a clean slate? Removing keeps your Mail IDs, settings and campaign history.
+            </p>
+            <RemoveWorkbookButton onOpen={onRemoveWorkbook} />
+          </div>
+        </>
       )}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="relative overflow-hidden">

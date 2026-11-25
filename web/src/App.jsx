@@ -3,6 +3,7 @@ import Shell from './components/Shell';
 import Settings from './components/Settings';
 import VendorDrawer from './components/VendorDrawer';
 import { Toasts } from './components/ui';
+import { RemoveWorkbookDialog } from './components/RemoveWorkbook';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Matching from './pages/Matching';
@@ -25,6 +26,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const [flowDone, setFlowDone] = useState(() => new Set());
 
   const toast = useCallback((t) => {
@@ -124,6 +126,22 @@ export default function App() {
   const onSettingsSaved = (saved) => setState((prev) => ({ ...prev, settings: saved }));
   const onLoggedIn = (me) => { setUser(me); setAuthChecked(true); refreshState(); };
 
+  const onWorkbookRemoved = useCallback((res) => {
+    setState((prev) => ({
+      ...prev,
+      loaded: false,
+      stats: null,
+      vendors: [],
+      suggestions: [],
+      jobs: [],
+      history: res.history ?? prev.history,
+      settings: res.settings ?? prev.settings,
+    }));
+    setFlowDone(new Set());
+    setVendorOpen(null);
+    goTo('upload');
+  }, [goTo]);
+
   if (!authChecked) {
     return <div className="flex min-h-screen items-center justify-center bg-ink-950 text-[13px] font-semibold text-brand-200">Checking session…</div>;
   }
@@ -139,6 +157,7 @@ export default function App() {
         user={user}
         onChangePassword={() => setPasswordOpen(true)}
         onLogout={async () => { await logout(); }}
+        onRemoveWorkbook={() => setRemoveOpen(true)}
         flowDone={flowDone}
       >
         {route === 'dashboard' && (
@@ -146,7 +165,8 @@ export default function App() {
             openSettings={openSettings} done={flowDone} />
         )}
         {route === 'upload' && (
-          <Upload state={state} onLoaded={onLoaded} toast={toast} setRoute={goTo} />
+          <Upload state={state} onLoaded={onLoaded} toast={toast} setRoute={goTo}
+            onRemoveWorkbook={() => setRemoveOpen(true)} />
         )}
         {route === 'matching' && (
           <Matching state={state} onVendors={onVendors} toast={toast} openVendor={setVendorOpen}
@@ -170,6 +190,8 @@ export default function App() {
         toast={toast}
       />
       <VendorDrawer vendor={vendorOpen} onClose={() => setVendorOpen(null)} toast={toast} />
+      <RemoveWorkbookDialog open={removeOpen} onClose={() => setRemoveOpen(false)}
+        state={state} toast={toast} onRemoved={onWorkbookRemoved} />
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
       <Toasts items={toasts} dismiss={dismiss} />
     </>

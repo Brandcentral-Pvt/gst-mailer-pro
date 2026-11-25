@@ -64,6 +64,10 @@ can continue without hunting for the right button. On small screens the same ste
 and account actions (settings, password, sign out) are grouped in the top-right avatar menu. Live sends
 ask for one final confirmation; dry runs never do.
 
+**Remove workbook:** use **Remove** in the sidebar dataset card, the button on the Import screen, or
+**Account → Remove workbook**. It clears the parsed rows, the saved startup copy and generated
+attachments, with a confirmation that spells out what is kept (Mail IDs, settings and campaign history).
+
 ---
 
 ## Screens
